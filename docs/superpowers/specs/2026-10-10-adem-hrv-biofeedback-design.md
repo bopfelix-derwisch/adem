@@ -46,8 +46,9 @@ camera frame (60 fps, captureTime)
   → signaal: −kanaal → hoogdoorlaat 0,6 Hz → laagdoorlaat 4 Hz (2e-orde Butterworth-biquads, fs geschat uit timestamps)
   → slagdetectie: maximum van eerste afgeleide (steilste stijging) met parabolische sub-frame-interpolatie,
                   drempel 0,4 × max afgeleide over 3 s, refractair 0,33 s
-  → kwaliteit: max genormaliseerde autocorrelatie (lag 0,33–1,5 s) over laatste 10 s
-  → RR-intervallen → opschonen (|RR − mediaan| < 25 %) → HR, RMSSD, coherentie
+  → kwaliteit: aandeel van de laatste 8 s met 'goede' slagen — golfvorm lijkt op vorige slag (r ≥ 0,85),
+               interval < 30 % anders dan het vorige (autocorrelatie viel weg bij sterke HRV; live-test 2026-10-10)
+  → RR-intervallen → opschonen (|RR − lokale mediaan van 9 intervallen| < 25 %) → HR, RMSSD, coherentie
   → feedback (beeld + geluid)
 ```
 
@@ -81,9 +82,9 @@ Minimaal 45 s aan schone RR nodig; daarvoor toont de pagina "inlezen…".
 
 `start` → `zoek-vinger` → `inlezen` (tot 45 s schone data) → `oefenen` → `einde`; `pauze` vanuit elke meetfase.
 
-- **Start**: tik op "Begin". Instellingen: ademtempo (4,5–7 per minuut, standaard 5,5) en duur (3 / 5 / 10 min, standaard 5).
+- **Start**: tik op "Begin". Instellingen: ademtempo (4,5–7 per minuut, standaard 5,5) en duur (2 / 3 min, standaard 3 — de flitser wordt warm; na live-test 2026-10-10).
 - **Zoek-vinger**: tekst "Leg je wijsvinger licht op de lens naast de flitser" tot kwaliteit > 0,5 gedurende 3 s.
-- **Pauze**: kwaliteit < 0,3 gedurende 3 s → feedback-geluid dempt naar alleen de ademtonen, tekst "vinger kwijt — leg hem terug" (bij te weinig signaal ook "druk lichter"). De sessieklok loopt door; de pauzetijd wordt apart geteld.
+- **Pauze**: kwaliteit < 0,3 gedurende 3 s → klank dempt naar 30 % (niet stil: anders lijkt het geluid kapot), ademtonen blijven, tekst "vinger kwijt — leg hem terug" (bij te weinig signaal ook "druk lichter"). De sessieklok loopt door; de pauzetijd wordt apart geteld.
 - **Einde**: samenvattingsscherm.
 
 ### Ademgids (beeld)
@@ -92,6 +93,7 @@ Minimaal 45 s aan schone RR nodig; daarvoor toont de pagina "inlezen…".
 - Ritme: tempo `b` per minuut → cyclus `60/b` s, inademen 40 %, uitademen 60 % (bij 5,5/min: 4,4 s in, 6,5 s uit).
 - Kleur en gloed van de cirkel volgen de gladgestreken coherentie: koel blauwgrijs, dof (laag) → warm goud, heldere gloed (hoog).
 - Klein in een hoek: live hartslag en een mini-pulsgolf (bewijs dat de meting werkt).
+- **Vinger-indicator** (bovenaan): een hartje dat bij elke gedetecteerde slag oplicht, groen/oranje/rood voor signaal goed/zwak/geen, met korte tekst.
 - Respecteert `prefers-reduced-motion` (dan alleen schaal, geen gloed-animatie).
 
 ### Geluid (Web Audio)

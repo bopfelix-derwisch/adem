@@ -54,3 +54,8 @@ export function summary(s) {
     pauseSec: Math.round(s.stats.pauseSec),
   };
 }
+
+// Vinger-indicator: 'goed' | 'zwak' | 'geen' (zelfde drempels als pauze/hervat)
+export function signalLevel(q) {
+  return q > Q_GOOD ? 'goed' : q < Q_BAD ? 'geen' : 'zwak';
+}

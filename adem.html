@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>Adem</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #171b22; --fg: #e8e6e1; --muted: #8b929c;
+    --accent: #f0b85a; --line: #2a303a; --warn: #f2a65a; --err: #ff7b72; --ok: #5fd38d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+    display: flex; flex-direction: column; min-height: 100%;
+  }
+  main { flex: 1; max-width: 520px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; }
+  section { display: flex; flex-direction: column; gap: 16px; padding: 24px 0; flex: 1; }
+  section[hidden] { display: none; }
+  h1 { font-size: 28px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  p { margin: 0; color: var(--muted); }
+  label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 14px; }
+  label b { color: var(--fg); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  select, button {
+    font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px; min-height: 44px;
+  }
+  button.primary { background: var(--accent); color: #1a1408; border: 0; font-weight: 600; font-size: 18px; }
+  .note { font-size: 14px; }
+  .err { color: var(--err); font-size: 14px; min-height: 1em; }
+  .warn { color: var(--warn); font-size: 14px; min-height: 1em; text-align: center; }
+  #practice { gap: 8px; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; color: var(--muted); font-size: 14px; }
+  .top b { color: var(--fg); font-size: 22px; font-variant-numeric: tabular-nums; }
+  .sig { display: flex; align-items: baseline; gap: 6px; }
+  .heart { display: inline-block; font-size: 22px; line-height: 1; color: var(--muted); transition: color .3s; }
+  .heart.tick { animation: tick .3s ease-out; }
+  @keyframes tick { from { transform: scale(1.45); } to { transform: scale(1); } }
+  .sig[data-level=goed] .heart { color: var(--ok); }
+  .sig[data-level=zwak] .heart { color: var(--warn); }
+  .sig[data-level=geen] .heart { color: var(--err); }
+  #sigtext { font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) { .heart.tick { animation: none; } }
+  #circle { width: 100%; flex: 1; min-height: 300px; }
+  #status { text-align: center; font-size: 17px; min-height: 2.9em; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row > * { flex: 1 1 auto; }
+  .row input[type=range] { flex: 2 1 120px; }
+  dl { display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; margin: 0; }
+  dt { color: var(--muted); } dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+  #history { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 12px 0; }
+</style>
+</head>
+<body>
+<main>
+  <section id="setup">
+    <h1>Adem</h1>
+    <p>Adem rustig mee met de cirkel. De camera meet via je vingertop je hartslag; kleur en klank laten zien hoe gelijkmatig je hartritme met je adem meegolft.</p>
+    <label>Ademtempo: <b><span id="tempo-val">5,5</span> per minuut</b>
+      <input id="tempo" type="range" min="4.5" max="7" step="0.5" value="5.5">
+    </label>
+    <label>Duur
+      <select id="duur">
+        <option value="2">2 minuten</option>
+        <option value="3" selected>3 minuten</option>
+      </select>
+    </label>
+    <p class="note">Leg straks je wijsvinger licht op de lens naast de flitser. Het hartje knippert bij elke slag die de camera ziet; groen = goed signaal. De flitser wordt warm, daarom duurt een sessie hooguit 3 minuten.</p>
+    <button id="begin" class="primary">Begin</button>
+    <div id="err" class="err" role="alert"></div>
+  </section>
+
+  <section id="practice" hidden>
+    <div class="top">
+      <span class="sig" id="sig" data-level="geen"><span id="beat" class="heart" aria-hidden="true">♥</span><b id="hr">–</b><span id="sigtext">geen vinger</span></span>
+      <span>nog <b id="time">–</b></span>
+    </div>
+    <canvas id="circle" aria-hidden="true"></canvas>
+    <div id="status" aria-live="polite"></div>
+    <div id="warn" class="warn"></div>
+    <div class="row">
+      <button id="mute">Geluid uit</button>
+      <input id="volume" type="range" min="0" max="1" step="0.05" value="0.7" aria-label="Volume">
+    </div>
+    <div class="row">
+      <button id="lens">Andere lens</button>
+      <button id="stop">Stoppen</button>
+    </div>
+    <video id="video" playsinline muted></video>
+  </section>
+
+  <section id="summary" hidden>
+    <h1>Klaar</h1>
+    <dl>
+      <dt>Gemiddelde hartslag</dt><dd id="s-hr">–</dd>
+      <dt>RMSSD</dt><dd id="s-rmssd">–</dd>
+      <dt>Gemiddelde coherentie</dt><dd id="s-coh">–</dd>
+      <dt>Tijd in hoge coherentie</dt><dd id="s-high">–</dd>
+      <dt>Pauze</dt><dd id="s-pause">–</dd>
+    </dl>
+    <p>Eerdere sessies (alleen op dit toestel)</p>
+    <ul id="history"></ul>
+    <button id="again" class="primary">Nog een keer</button>
+  </section>
+</main>
+<footer>Geen medisch instrument · alles blijft op je telefoon</footer>
+<script type="module" src="adem/app.mjs"></script>
+</body>
+</html>

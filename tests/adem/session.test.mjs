@@ -1,6 +1,6 @@
 import assert from 'assert';
 import { test } from '../harness.mjs';
-import { createSession, step, summary } from '../../adem/session.mjs';
+import { createSession, step, summary, signalLevel } from '../../adem/session.mjs';
 
 // Draai `sec` seconden in tikken van 1 s met vaste input; geeft toestanden per tik
 function run(s, sec, input) {
@@ -71,4 +71,11 @@ test('session: korte dip (< 3 s) geeft geen pauze', () => {
   run(s, 1, { quality: 0.9, coherence: null });
   run(s, 2, { quality: 0.1, coherence: null });
   assert.strictEqual(s.state, 'inlezen');
+});
+
+test('session: signaalniveau voor de vinger-indicator', () => {
+  assert.strictEqual(signalLevel(0.9), 'goed');
+  assert.strictEqual(signalLevel(0.5), 'zwak');   // grens: goed is > 0,5
+  assert.strictEqual(signalLevel(0.3), 'zwak');   // grens: geen is < 0,3
+  assert.strictEqual(signalLevel(0.1), 'geen');
 });

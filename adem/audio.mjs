@@ -49,8 +49,8 @@ export class Sound {
     this._ramp(this.wind.gain, 0.12 * (1 - c));
   }
 
-  // Pauze: alleen de ademtonen blijven
-  duck(on) { if (this.ctx) this._ramp(this.feedback.gain, on ? 0 : 1); }
+  // Pauze: klank zacht (niet stil — anders lijkt het geluid kapot), ademtonen blijven
+  duck(on) { if (this.ctx) this._ramp(this.feedback.gain, on ? 0.3 : 1); }
 
   cue(phase) {
     if (!this.ctx) return;
