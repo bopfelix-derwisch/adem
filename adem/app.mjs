@@ -12,9 +12,9 @@ import { explain } from './explain.mjs';
 import { assess } from './norms.mjs';
 import { suggestTempo } from './tempo.mjs';
 import { colorAt } from './palette.mjs';
+import { localStore } from './store.mjs';
 
 const $ = id => document.getElementById(id);
-const HISTORY_KEY = 'adem.history', PROFILE_KEY = 'adem.profile';
 const TAU = 10;        // s, gladstrijken coherentie
 const COH_EVERY = 5;   // s tussen coherentieberekeningen
 
@@ -29,19 +29,11 @@ function setStatus(text) { $('status').textContent = text; }
 function warn(text) { $('warn').textContent = text; }
 const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-function loadHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch (e) { return []; } }
-function saveHistory(item) {
-  const h = [item, ...loadHistory()].slice(0, 20);
-  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch (e) { /* privémodus: alleen dit scherm */ }
-  return h;
-}
-
-// Profiel (leeftijd, geslacht, lengte, gewicht): alleen op dit toestel
-function loadProfile() {
-  try { const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); return p && typeof p === 'object' ? p : null; } catch (e) { return null; }
-}
-function storeProfile(p) { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { /* privémodus */ } }
-let profile = loadProfile();
+// Opslag: standaard alleen op dit toestel; een omgeving met login kan er een eigen meegeven
+function defaultStorage() { try { return globalThis.localStorage; } catch (e) { return undefined; } }
+const store = globalThis.ADEM_STORE || localStore(defaultStorage());
+const loadHistory = () => store.loadHistory();
+let profile = store.loadProfile();
 
 const num = id => { const v = parseFloat($(id).value.replace(',', '.')); return isFinite(v) ? v : null; };
 function openProfile() {
@@ -55,10 +47,10 @@ function saveProfile() {
   if (p.age !== null && (p.age < 12 || p.age > 110)) { $('p-err').textContent = 'Leeftijd tussen 12 en 110.'; return; }
   if (p.height !== null && (p.height < 100 || p.height > 230)) { $('p-err').textContent = 'Lengte in centimeters (100–230).'; return; }
   if (p.weight !== null && (p.weight < 25 || p.weight > 300)) { $('p-err').textContent = 'Gewicht in kilo (25–300).'; return; }
-  profile = p; storeProfile(p);
+  profile = p; store.saveProfile(p);
   toSetup();
 }
-function skipProfile() { if (!profile) { profile = {}; storeProfile(profile); } toSetup(); }
+function skipProfile() { if (!profile) { profile = {}; store.saveProfile(profile); } toSetup(); }
 
 function profileText(p) {
   if (!p || !(p.age || p.height || p.weight)) return 'Geen profiel — vul in voor normen en tempovoorstel';
@@ -237,7 +229,7 @@ function finish() {
     highPct: sum.highPct, pauseSec: sum.pauseSec,
   };
   const ex = explain(item, loadHistory());
-  const history = saveHistory(item);
+  const history = store.addSession(item);
   const as = assess(item, profile);
   renderExplain(ex, as);
   renderAssessment(as);
@@ -271,10 +263,8 @@ function renderAssessment(as) {
 }
 
 function chooseFeel(feel, btn) {
-  const h = loadHistory();
+  const h = store.updateLatest({ feel });
   if (!h.length) return;
-  h[0].feel = feel;
-  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch (e) { /* privémodus */ }
   for (const b of document.querySelectorAll('#feel button')) b.setAttribute('aria-pressed', String(b === btn));
   const s = suggestTempo(profile, h);
   $('next-tempo').textContent = 'Volgende keer: ' + fmtT(s.tempo) + ' per minuut. ' + s.reason;
