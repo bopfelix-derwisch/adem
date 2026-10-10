@@ -4,6 +4,9 @@ const KEEP = 12;          // seconden gefilterd signaal bewaren
 const REFRACTORY = 0.33;  // s, max ~180 bpm
 const GAP_RESET = 1.0;    // s zonder frames → opnieuw beginnen
 const SETTLE = 2.0;       // s na (her)start geen slagen melden: filter slingert nog in
+const Q_WINDOW = 8;       // s, venster voor de kwaliteit
+const MAX_STEP = 0.3;     // max relatieve RR-verandering per slag (ademgolf ~12 %, plus meetruis)
+const MIN_SHAPE = 0.85;   // min correlatie tussen de golfvormen van opeenvolgende slagen
 
 // 2e-orde Butterworth-biquad (RBJ-cookbook), type 'hp' of 'lp'
 export function biquad(type, f0, fs) {
@@ -34,6 +37,7 @@ class Track {
     this.filter = makeBandpass(fs);
     this.F = [];
     this.lastBeat = -Infinity;
+    this.beats = [];
     for (const f of warmup) this.filter(-(f[key] - warmup[0][key])); // inslingeren
     this.offset = warmup[0][key];
   }
@@ -55,29 +59,50 @@ class Track {
     const tb = F[i].t + off * (F[i + 1].t - F[i - 1].t) / 2;
     if (tb - this.lastBeat < REFRACTORY) return null;
     this.lastBeat = tb;
+    this.beats.push(tb);
+    while (this.beats.length && f.t - this.beats[0] > KEEP) this.beats.shift();
     return tb;
   }
 
-  // Max genormaliseerde autocorrelatie over laatste 10 s, lag 0,33–1,5 s
-  quality(fs) {
-    const tEnd = this.F.length ? this.F[this.F.length - 1].t : 0;
-    const W = this.F.filter(p => p.t > tEnd - 10);
-    if (W.length < 6 * fs) return { q: 0, bpm: null };
-    const mu = W.reduce((a, p) => a + p.y, 0) / W.length, x = W.map(p => p.y - mu);
-    const r0 = x.reduce((a, v) => a + v * v, 0) || 1;
-    const L0 = Math.round(0.33 * fs), L1 = Math.round(1.5 * fs), ac = [];
-    for (let L = L0 - 1; L <= L1 + 1; L++) {
-      let s = 0;
-      for (let k = 0; k + L < x.length; k++) s += x[k] * x[k + L];
-      ac[L] = s / (r0 * (x.length - L) / x.length);
-    }
-    let best = -1;
-    for (let L = L0; L <= L1; L++) best = Math.max(best, ac[L]);
-    // Kortste periode met een lokaal maximum ≥ 85 % van het beste: voorkomt halve hartslag
-    let lag = L0;
-    for (let L = L0; L <= L1; L++) if (ac[L] >= ac[L - 1] && ac[L] >= ac[L + 1] && ac[L] >= 0.85 * best) { lag = L; break; }
-    return { q: Math.max(0, best), bpm: 60 * fs / lag };
+  // Golfvorm rond een slag (−0,15…+0,25 s), als array van y-waarden
+  _segment(tb) {
+    return this.F.filter(p => p.t >= tb - 0.15 && p.t <= tb + 0.25).map(p => p.y);
   }
+
+  // Kwaliteit = aandeel van de laatste 8 s dat bestaat uit "goede" slagen: interval
+  // binnen 0,33–1,5 s, < 30 % verschil met het vorige interval, en een golfvorm die op
+  // de vorige slag lijkt. Robuust voor een sterk meegolvende hartslag (geen vaste periode
+  // nodig, anders dan autocorrelatie); ruis heeft geen herhaalde vorm.
+  quality() {
+    const tEnd = this.F.length ? this.F[this.F.length - 1].t : 0, ws = tEnd - Q_WINDOW;
+    const B = this.beats;
+    let good = 0, first = null;
+    const goodRR = [];
+    for (let i = 2; i < B.length; i++) {
+      if (B[i] <= ws) continue;
+      if (first === null) first = B[i - 1] > ws ? B[i - 1] : ws;
+      const rr = B[i] - B[i - 1], prev = B[i - 1] - B[i - 2];
+      if (rr < REFRACTORY || rr > 1.5 || Math.abs(rr - prev) > MAX_STEP * prev) continue;
+      if (correlation(this._segment(B[i - 1]), this._segment(B[i])) < MIN_SHAPE) continue;
+      good += Math.min(rr, B[i] - ws);
+      goodRR.push(rr);
+    }
+    if (first === null || !goodRR.length) return { q: 0, bpm: null };
+    const span = Math.max(tEnd - first, 1);
+    const med = goodRR.slice().sort((a, b) => a - b)[goodRR.length >> 1];
+    return { q: Math.min(1, good / span), bpm: 60 / med };
+  }
+}
+
+function correlation(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (n < 5) return 0;
+  let ma = 0, mb = 0;
+  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; sab += x * y; saa += x * x; sbb += y * y; }
+  return saa && sbb ? sab / Math.sqrt(saa * sbb) : 0;
 }
 
 // Verwerkt camera-frames {t (s), r, g, b} tot slagen; kiest zelf het beste kanaal (R of G)
@@ -114,7 +139,7 @@ export class PpgProcessor {
   // Elke ~1 s aanroepen: kiest het kanaal met de beste kwaliteit
   quality() {
     if (!this.tracks) return { q: 0, bpm: null, fps: this.fs };
-    const qr = this.tracks.r.quality(this.fs), qg = this.tracks.g.quality(this.fs);
+    const qr = this.tracks.r.quality(), qg = this.tracks.g.quality();
     this.active = qg.q > qr.q + 0.1 ? 'g' : qr.q > qg.q + 0.1 ? 'r' : this.active;
     const q = this.active === 'r' ? qr : qg;
     return { q: q.q, bpm: q.bpm, fps: this.fs };

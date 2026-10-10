@@ -84,3 +84,25 @@ test('signal: dubbele en terug-in-de-tijd frames worden genegeerd', () => {
   assert.strictEqual(p.push({ t: 39 / 60, r: 0, g: 0, b: 0 }), null);
   assert.strictEqual(p.lastT, 39 / 60);
 });
+
+test('signal: sterke ademgolf in hartslag (RR ±0,2 s, 0,09 Hz) → kwaliteit blijft > 0,5', () => {
+  // Bij goed coherent ademen schommelt de hartslag sterk; dat mag geen "vinger kwijt" geven
+  const beats = beatTimes({ seconds: 60, modAmp: 0.2, modHz: 0.09 });
+  const p = new PpgProcessor(), qs = [];
+  for (const f of ppgFrames({ beats, seconds: 60, noise: 0.4 })) {
+    p.push(f);
+    if (f.t > 15 && Math.abs(f.t % 1) < 1 / 60) qs.push(p.quality().q);
+  }
+  assert.ok(Math.min(...qs) > 0.5, `kwaliteit min ${Math.min(...qs).toFixed(2)}`);
+});
+
+test('signal: ruis met meerdere seeds → kwaliteit blijft < 0,3', () => {
+  for (const seed of [7, 8, 9, 10, 11]) {
+    const p = new PpgProcessor(), qs = [];
+    for (const f of noiseFrames({ seconds: 40, seed })) {
+      p.push(f);
+      if (f.t > 15 && Math.abs(f.t % 1) < 1 / 60) qs.push(p.quality().q);
+    }
+    assert.ok(Math.max(...qs) < 0.3, `seed ${seed}: kwaliteit max ${Math.max(...qs).toFixed(2)}`);
+  }
+});
