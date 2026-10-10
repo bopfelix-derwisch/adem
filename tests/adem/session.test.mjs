@@ -79,3 +79,19 @@ test('session: signaalniveau voor de vinger-indicator', () => {
   assert.strictEqual(signalLevel(0.3), 'zwak');   // grens: geen is < 0,3
   assert.strictEqual(signalLevel(0.1), 'geen');
 });
+
+test('session: modus zonder meting start direct, pauzeert nooit, eindigt op tijd', () => {
+  const s = createSession(60, { measured: false });
+  assert.strictEqual(s.state, 'oefenen');
+  run(s, 30, { quality: 0, coherence: null });
+  assert.strictEqual(s.state, 'oefenen');           // geen vinger → geen pauze
+  step(s, 1, { quality: 0, coherence: null, hidden: true });
+  assert.strictEqual(s.state, 'oefenen');           // tabblad weg → geen pauze
+  run(s, 29, { quality: 0, coherence: null });
+  assert.strictEqual(s.state, 'einde');
+  const sum = summary(s);
+  assert.strictEqual(sum.practiceSec, 60);
+  assert.strictEqual(sum.meanCoherence, null);
+  assert.strictEqual(sum.highPct, null);
+  assert.strictEqual(sum.pauseSec, 0);
+});

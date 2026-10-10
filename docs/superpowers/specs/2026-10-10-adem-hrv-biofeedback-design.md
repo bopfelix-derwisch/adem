@@ -107,6 +107,15 @@ Minimaal 45 s aan schone RR nodig; daarvoor toont de pagina "inlezen…".
 
 Gemiddelde HR, RMSSD (hele sessie), gemiddelde coherentie, % tijd in "hoog", pauzetijd. Laatste 20 sessies in `localStorage` als lijstje (datum, duur, gem. coherentie). Geen serveropslag.
 
+## Uitbreiding na live-test (2026-10-10)
+
+**Modus "Alleen ademen"** — keuze bij de start naast "Met hartslag". Geen camera en geen flitser (die werd te warm); de sessie start direct in `oefenen`, pauzeert nooit en eindigt op tijd (`createSession(sec, {measured: false})`). Duur 3 / 5 / 10 / 20 min (standaard 5); in de hartslagmodus blijft het 2 / 3 min. De cirkel heeft een vaste warme tint, de klank een rustig akkoord; de vinger-indicator en de knop "Andere lens" zijn verborgen. Eindscherm: modus en ademtempo; de geschiedenis vermeldt de modus.
+
+**Klank volgens wat onderzoek ondersteunt:**
+- *Klank die meeademt* (beide modi, altijd aan): de grondtoon wordt helderder en luider bij inademen (laagdoorlaat 300 → 1300 Hz, volume 0,10 → 0,24) en donkerder bij uitademen. Muzikaal begeleid resonantie-ademen is het best onderbouwde effect van geluid hier (adem → HRV), sterker dan claims over hersengolven.
+- *Binaurale toon* (optioneel, schakelaar, standaard uit, alleen met koptelefoon): links 200 Hz, rechts 206 Hz → 6 Hz theta-verschil, zacht (0,05). De pagina vermeldt dat het bewijs voor het meenemen van hersengolven niet eenduidig is (review 2023: 5 van 14 EEG-studies vóór).
+- Isochrone pulsen en 40 Hz-stimulatie: niet opgenomen (zwak bewijs resp. ander doel).
+
 ## Foutafhandeling
 
 | Situatie | Gedrag |
@@ -136,7 +145,7 @@ In de voettekst staat: "Geen medisch instrument."
 
 ## Buiten scope (YAGNI)
 
-- Contactloze meting via de voorcamera (optie B) — eventueel later als tweede modus.
+- Contactloze meting via de voorcamera (optie B) — de tweede modus is nu "alleen ademen" zonder meting.
 - EEG / Muse (optie C).
 - Opslag in KV, koppeling met ritueel of LLM-reflectie.
 - Account/login: de pagina is publiek bereikbaar maar verwerkt alles lokaal.

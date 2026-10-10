@@ -2,6 +2,19 @@
 
 const RAMP = 2; // s, overgangen van de klank
 
+// Grondtoon volgt de ademcirkel (size 0 = uitgeademd, 1 = ingeademd): helderder en luider bij
+// inademen. Klank die meeademt helpt het ademtempo vast te houden (muzikaal begeleid
+// resonantie-ademen); dat is het best onderbouwde effect van geluid in deze context.
+export function breathTone(size) {
+  return { cutoff: 300 + 1000 * size, gain: 0.1 + 0.14 * size };
+}
+
+// Binaurale toon (alleen zinvol met koptelefoon): links/rechts verschillen 6 Hz → theta.
+// Bewijs voor "hersengolven meenemen" is gemengd; de pagina zegt dat er ook bij.
+export function binauralFreqs(beatHz = 6, carrier = 200) {
+  return { left: carrier, right: carrier + beatHz };
+}
+
 export class Sound {
   async start() {
     // iOS: zonder dit zwijgt Web Audio als de stil-schakelaar aan staat
@@ -15,8 +28,8 @@ export class Sound {
     this.feedback.connect(this.master);
 
     // Grondtoon: twee licht ontstemde sinussen door een laagdoorlaat
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800;
-    const drone = ctx.createGain(); drone.gain.value = 0.18;
+    const lp = this.lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = breathTone(0).cutoff;
+    const drone = this.drone = ctx.createGain(); drone.gain.value = breathTone(0).gain;
     lp.connect(drone); drone.connect(this.feedback);
     this.oscs = [110, 110.7].map(f => { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(lp); o.start(); return o; });
 
@@ -47,6 +60,28 @@ export class Sound {
     if (!this.ctx) return;
     this._ramp(this.harm.gain, 0.12 * c);
     this._ramp(this.wind.gain, 0.12 * (1 - c));
+  }
+
+  // size 0–1 uit de ademgids; zachte volging (τ 0,15 s) zodat het vloeiend klinkt
+  setBreath(size) {
+    if (!this.ctx) return;
+    const { cutoff, gain } = breathTone(size), now = this.ctx.currentTime;
+    this.lp.frequency.setTargetAtTime(cutoff, now, 0.15);
+    this.drone.gain.setTargetAtTime(gain, now, 0.15);
+  }
+
+  // Binaurale toon aan/uit: links en rechts apart via een kanaal-samenvoeger
+  setBinaural(on) {
+    if (!this.ctx) return;
+    if (this.binaural) { this.binaural.forEach(n => { try { n.stop(); } catch (e) { /* al gestopt */ } }); this.binaural = null; }
+    if (!on) return;
+    const ctx = this.ctx, { left, right } = binauralFreqs();
+    const merger = ctx.createChannelMerger(2), g = ctx.createGain();
+    g.gain.value = 0.05;
+    merger.connect(g); g.connect(this.master);
+    this.binaural = [[left, 0], [right, 1]].map(([f, ch]) => {
+      const o = ctx.createOscillator(); o.frequency.value = f; o.connect(merger, 0, ch); o.start(); return o;
+    });
   }
 
   // Pauze: klank zacht (niet stil — anders lijkt het geluid kapot), ademtonen blijven

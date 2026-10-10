@@ -1,13 +1,14 @@
 // adem/session.mjs — sessie-toestanden en statistiek (puur, geen DOM)
 //
 // zoek-vinger → inlezen → oefenen → einde;  inlezen/oefenen ⇄ pauze
+// Zonder meting (modus "alleen ademen"): direct oefenen → einde, nooit pauze.
 
 export const Q_GOOD = 0.5, Q_BAD = 0.3, HOLD = 3; // kwaliteitsdrempels, s aanhouden
 export const HIGH = 0.6;                           // coherentie "hoog"
 
-export function createSession(durationSec) {
+export function createSession(durationSec, { measured = true } = {}) {
   return {
-    state: 'zoek-vinger', resume: null, durationSec,
+    state: measured ? 'zoek-vinger' : 'oefenen', measured, resume: null, durationSec,
     elapsed: 0,      // s sinds vinger gevonden (sessieklok, loopt ook in pauze)
     goodFor: 0, badFor: 0,
     stats: { practiceSec: 0, highSec: 0, cohIntegral: 0, pauseSec: 0 },
@@ -21,6 +22,11 @@ export function step(s, dt, { quality, coherence, hidden = false }) {
   s.badFor = quality < Q_BAD ? s.badFor + dt : 0;
 
   if (s.state !== 'zoek-vinger') s.elapsed += dt;
+  if (!s.measured) {
+    s.stats.practiceSec += dt;
+    if (s.elapsed >= s.durationSec) s.state = 'einde';
+    return s;
+  }
 
   switch (s.state) {
     case 'zoek-vinger':
@@ -46,11 +52,11 @@ export function step(s, dt, { quality, coherence, hidden = false }) {
 }
 
 export function summary(s) {
-  const p = s.stats.practiceSec;
+  const p = s.stats.practiceSec, cp = s.measured ? p : 0; // zonder meting: geen coherentie
   return {
     practiceSec: Math.round(p),
-    meanCoherence: p ? s.stats.cohIntegral / p : null,
-    highPct: p ? Math.round(100 * s.stats.highSec / p) : null,
+    meanCoherence: cp ? s.stats.cohIntegral / cp : null,
+    highPct: cp ? Math.round(100 * s.stats.highSec / cp) : null,
     pauseSec: Math.round(s.stats.pauseSec),
   };
 }

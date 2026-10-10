@@ -45,6 +45,13 @@
   .sig[data-level=zwak] .heart { color: var(--warn); }
   .sig[data-level=geen] .heart { color: var(--err); }
   #sigtext { font-size: 13px; }
+  [data-mode=adem] .sig, [data-mode=adem] #lens, #summary[data-mode=adem] .hart-only { display: none; }
+  fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  legend { color: var(--muted); font-size: 14px; margin-bottom: 6px; padding: 0; }
+  .choice { flex-direction: row; align-items: center; gap: 10px; color: var(--fg); font-size: 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 44px; }
+  .choice input { accent-color: var(--accent); width: 20px; height: 20px; margin: 0; }
+  .choice small { display: block; color: var(--muted); font-size: 13px; }
   @media (prefers-reduced-motion: reduce) { .heart.tick { animation: none; } }
   #circle { width: 100%; flex: 1; min-height: 300px; }
   #status { text-align: center; font-size: 17px; min-height: 2.9em; }
@@ -63,16 +70,19 @@
   <section id="setup">
     <h1>Adem</h1>
     <p>Adem rustig mee met de cirkel. De camera meet via je vingertop je hartslag; kleur en klank laten zien hoe gelijkmatig je hartritme met je adem meegolft.</p>
+    <fieldset>
+      <legend>Modus</legend>
+      <label class="choice"><input type="radio" name="mode" value="hart" checked><span>Met hartslag<small>vinger op de camera, met coherentie-feedback</small></span></label>
+      <label class="choice"><input type="radio" name="mode" value="adem"><span>Alleen ademen<small>geen camera of flitser — niets wordt warm</small></span></label>
+    </fieldset>
     <label>Ademtempo: <b><span id="tempo-val">5,5</span> per minuut</b>
       <input id="tempo" type="range" min="4.5" max="7" step="0.5" value="5.5">
     </label>
     <label>Duur
-      <select id="duur">
-        <option value="2">2 minuten</option>
-        <option value="3" selected>3 minuten</option>
-      </select>
+      <select id="duur"></select>
     </label>
-    <p class="note">Leg straks je wijsvinger licht op de lens naast de flitser. Het hartje knippert bij elke slag die de camera ziet; groen = goed signaal. De flitser wordt warm, daarom duurt een sessie hooguit 3 minuten.</p>
+    <label class="choice"><input type="checkbox" id="binaural"><span>Binaurale toon (koptelefoon)<small>6 Hz theta-verschil tussen links en rechts; of dit hersengolven meeneemt is wetenschappelijk niet eenduidig</small></span></label>
+    <p class="note" id="mode-note"></p>
     <button id="begin" class="primary">Begin</button>
     <div id="err" class="err" role="alert"></div>
   </section>
@@ -99,11 +109,13 @@
   <section id="summary" hidden>
     <h1>Klaar</h1>
     <dl>
-      <dt>Gemiddelde hartslag</dt><dd id="s-hr">–</dd>
-      <dt>RMSSD</dt><dd id="s-rmssd">–</dd>
-      <dt>Gemiddelde coherentie</dt><dd id="s-coh">–</dd>
-      <dt>Tijd in hoge coherentie</dt><dd id="s-high">–</dd>
-      <dt>Pauze</dt><dd id="s-pause">–</dd>
+      <dt>Modus</dt><dd id="s-mode">–</dd>
+      <dt>Ademtempo</dt><dd id="s-tempo">–</dd>
+      <dt class="hart-only">Gemiddelde hartslag</dt><dd class="hart-only" id="s-hr">–</dd>
+      <dt class="hart-only">RMSSD</dt><dd class="hart-only" id="s-rmssd">–</dd>
+      <dt class="hart-only">Gemiddelde coherentie</dt><dd class="hart-only" id="s-coh">–</dd>
+      <dt class="hart-only">Tijd in hoge coherentie</dt><dd class="hart-only" id="s-high">–</dd>
+      <dt class="hart-only">Pauze</dt><dd class="hart-only" id="s-pause">–</dd>
     </dl>
     <p>Eerdere sessies (alleen op dit toestel)</p>
     <ul id="history"></ul>
