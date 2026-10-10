@@ -6,13 +6,17 @@ export const LEVELS = { low: 0.3, high: 0.6 };
 
 const median = xs => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; };
 
-// Slagtijden (s) → [{t, rr}] met rr = t_i − t_{i−1}; uitschieters (> 25 % van mediaan) eruit
+// Slagtijden (s) → [{t, rr}] met rr = t_i − t_{i−1}; uitschieters (> 25 % van de mediaan
+// van de 9 omliggende intervallen) eruit. Lokaal, zodat een sterke ademgolf in de hartslag
+// — precies wat de oefening opwekt — niet als uitschieter telt.
 export function rrSeries(beats) {
   const all = [];
   for (let i = 1; i < beats.length; i++) all.push({ t: beats[i], rr: beats[i] - beats[i - 1] });
   if (all.length < 3) return all;
-  const med = median(all.map(p => p.rr));
-  return all.filter(p => Math.abs(p.rr - med) < 0.25 * med);
+  return all.filter((p, i) => {
+    const med = median(all.slice(Math.max(0, i - 4), i + 5).map(q => q.rr));
+    return Math.abs(p.rr - med) < 0.25 * med;
+  });
 }
 
 export function heartRate(rr) {   // rr in s → bpm

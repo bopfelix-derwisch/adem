@@ -53,3 +53,10 @@ test('hrv: gat van 10 s (vinger weg) → nog steeds een waarde, geen NaN', () =>
   const S = rrSeries(beats);
   assert.ok(S.every(p => p.rr < 1.2), 'RR over het gat niet weggefilterd');
 });
+
+test('hrv: sterke ademgolf (RR 0,85 ± 0,25 s) — toppen en dalen blijven behouden', () => {
+  const beats = beatTimes({ seconds: 70, modAmp: 0.25, modHz: 0.09 });
+  const all = beats.length - 1, kept = rrSeries(beats).length;
+  assert.strictEqual(kept, all, `${all - kept} echte intervallen weggegooid`);
+  assert.ok(coherence(beats, 70).value > 0.6, 'coherentie');
+});
