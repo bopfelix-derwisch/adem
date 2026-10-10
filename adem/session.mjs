@@ -5,12 +5,14 @@
 
 export const Q_GOOD = 0.5, Q_BAD = 0.3, HOLD = 3; // kwaliteitsdrempels, s aanhouden
 export const HIGH = 0.6;                           // coherentie "hoog"
+export const MAX_DT = 2;                           // s; grotere tik = pagina was weg (iOS pauzeert timers)
+export const SEARCH_MAX = 90;                      // s zoeken naar de vinger, daarna stoppen (flitser wordt warm)
 
 export function createSession(durationSec, { measured = true } = {}) {
   return {
     state: measured ? 'zoek-vinger' : 'oefenen', measured, resume: null, durationSec,
     elapsed: 0,      // s sinds vinger gevonden (sessieklok, loopt ook in pauze)
-    goodFor: 0, badFor: 0,
+    goodFor: 0, badFor: 0, searchSec: 0,
     stats: { practiceSec: 0, highSec: 0, cohIntegral: 0, pauseSec: 0 },
   };
 }
@@ -18,6 +20,13 @@ export function createSession(durationSec, { measured = true } = {}) {
 // Eén tik van dt seconden. input: { quality, coherence (gladgestreken, of null), hidden }
 export function step(s, dt, { quality, coherence, hidden = false }) {
   if (s.state === 'einde') return s;
+  if (s.measured && dt > MAX_DT && s.state !== 'zoek-vinger') {
+    // Pagina was op de achtergrond: die tijd telt als pauze, nooit als oefening
+    s.elapsed += dt; s.stats.pauseSec += dt; s.goodFor = s.badFor = 0;
+    if (s.state !== 'pauze') { s.resume = s.state; s.state = 'pauze'; }
+    if (s.elapsed >= s.durationSec) s.state = 'einde';
+    return s;
+  }
   s.goodFor = quality > Q_GOOD ? s.goodFor + dt : 0;
   s.badFor = quality < Q_BAD ? s.badFor + dt : 0;
 
@@ -30,7 +39,9 @@ export function step(s, dt, { quality, coherence, hidden = false }) {
 
   switch (s.state) {
     case 'zoek-vinger':
+      s.searchSec += dt;
       if (s.goodFor >= HOLD) s.state = 'inlezen';
+      else if (s.searchSec > SEARCH_MAX) s.state = 'einde';
       break;
     case 'inlezen':
     case 'oefenen':

@@ -156,3 +156,11 @@ In de voettekst staat: "Geen medisch instrument."
 - **Andere iPhones**: andere lensindeling; opgevangen met "Andere lens" + onthouden keuze. Alleen getest op 15 Pro.
 - **Vercel `.mjs` MIME-type**: bij een verkeerd type laden de modules niet. Terugvaloptie: hernoemen naar `.js` en de tests via een kopie draaien.
 - **Coherentiedrempels**: zelf gekozen, niet de HeartMath-schaal; kalibreren in de live-test.
+
+## Uitbreiding 2 (2026-10-10): kleur, vormgeving, uitleg, review-fixes
+
+- **Kleur koud → warm** (`adem/palette.mjs`): blauw (OKLCH h 250) → turquoise/groen → gedempt amber/goud (h 72), geïnterpoleerd in OKLCH zodat er geen grijze tussentinten zijn. Geen fel rood: verzadigd rood/geel verhoogt in studies hartslag en opwinding; blauw voelt het rustigst; gedempt warm licht hangt samen met hogere vagale HRV (bewijs gemengd, systematische review 2025). De bol is nooit grijs: tijdens inlezen/zoeken het blauwe begin (gedimd), in oefenen volgt hij de coherentie. Modus zonder meting: warmt in ~2 min op naar ~0,85, bij inademen iets warmer.
+- **Vormgeving**: ademende bol op het startscherm, gloed, voortgangsring rond de bol, kleurbalk koel–warm met stip, statistiekkaarten.
+- **Uitleg bij resultaten** (`adem/explain.mjs`): kop naar coherentieniveau (nooit oordelend), per getal wat het betekent en normaalwaarden, vergelijking met het gemiddelde van de vorige ≤ 5 hartslagsessies (±10 % = gelijk), en "Waarom werkt dit?" (resonantie/baroreflex).
+- **Vinger weg** wordt direct herkend aan het ontbreken van een overwegend rood beeld (r > 40, r > 1,3·g, r > 1,3·b) gedurende 0,5 s: kwaliteit meteen 0, geen ruisslagen, schone herstart bij terugleggen.
+- **Achtergrond**: verborgen → meteen pauze; een tik > 2 s telt als pauze, nooit als oefening. **Zoeken** naar de vinger stopt na 90 s (flitser). **Begin** kan niet dubbel starten.

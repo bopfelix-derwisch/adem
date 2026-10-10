@@ -1,12 +1,14 @@
 // adem/app.mjs — koppelt camera → signaal → hrv → sessie → beeld + geluid (browser)
 
 import { PpgProcessor } from './signal.mjs';
-import { rrSeries, heartRate, rmssd, coherence, level } from './hrv.mjs';
+import { rrSeries, heartRate, rmssd, coherence, level, addBeat } from './hrv.mjs';
 import { breathAt, cueBetween } from './breath.mjs';
 import { createSession, step, summary, signalLevel, Q_GOOD } from './session.mjs';
 import { Camera } from './camera.mjs';
 import { Sound } from './audio.mjs';
 import { Visual } from './visual.mjs';
+import { ademWarmth } from './palette.mjs';
+import { explain } from './explain.mjs';
 
 const $ = id => document.getElementById(id);
 const HISTORY_KEY = 'adem.history';
@@ -17,7 +19,7 @@ let cam = null, sound = null, visual = null, proc = null, sess = null;
 let beats = [], bpmBreath = 5.5, t0 = 0, lastTick = 0, lastCoh = -Infinity;
 let cohRaw = null, cohSmooth = null, prevBreath = null, quality = 0;
 let wbLocked = false, wakeLock = null, timer = null, raf = null, volume = 0.7, muted = false;
-let measured = true, lastBreathSet = 0;
+let measured = true, lastBreathSet = 0, starting = false;
 
 function show(screen) { for (const id of ['setup', 'practice', 'summary']) $(id).hidden = id !== screen; }
 function setStatus(text) { $('status').textContent = text; }
@@ -44,7 +46,15 @@ function cameraError(e) {
       : 'Camera starten mislukt: ' + (e && e.message || e);
 }
 
+// Eén start tegelijk: een dubbele tik zou een tweede camera (met flitser) en timer achterlaten
 async function begin() {
+  if (starting || sess) return;
+  starting = true;
+  $('begin').disabled = true;
+  try { await start(); } finally { starting = false; $('begin').disabled = false; }
+}
+
+async function start() {
   $('err').textContent = '';
   const mode = document.querySelector('input[name=mode]:checked').value;
   measured = mode === 'hart';
@@ -71,6 +81,7 @@ async function begin() {
       warn(r.torch ? '' : 'Flitser niet beschikbaar — werk iOS bij (≥ 17.5) of meet bij fel licht.');
     } catch (e) {
       if (sound) sound.stop();
+      cam.close(); cam = null;
       $('err').textContent = cameraError(e);
       return;
     }
@@ -91,7 +102,7 @@ const SIGNAL_TEXT = { goed: 'signaal goed', zwak: 'signaal zwak — stil houden'
 
 function onFrame(f) {
   const b = proc.push(f);
-  if (b !== null) { beats.push(b); flashBeat(); }
+  if (b !== null) { beats = addBeat(beats, b); flashBeat(); }
 }
 
 // Direct zichtbare terugkoppeling: hartje licht op bij elke gedetecteerde slag
@@ -156,9 +167,10 @@ function frame() {
   if (cue && sound && sess.state !== 'zoek-vinger') sound.cue(cue);
   prevBreath = b;
   if (sound && now - lastBreathSet > 0.05) { sound.setBreath(b.size); lastBreathSet = now; }
+  const progress = sess.elapsed / sess.durationSec;
   visual.draw(measured
-    ? { size: b.size, coherence: sess.state === 'oefenen' ? cohSmooth : null, pulse: proc.pulse(4), active: measuring }
-    : { size: b.size, coherence: 0.6, pulse: [], active: true });
+    ? { size: b.size, warmth: sess.state === 'oefenen' && cohSmooth !== null ? cohSmooth : 0, pulse: proc.pulse(4), active: measuring, progress }
+    : { size: b.size, warmth: ademWarmth(now - t0, b.size), pulse: [], active: true, progress });
   raf = requestAnimationFrame(frame);
 }
 
@@ -181,7 +193,9 @@ function finish() {
     coherence: sum.meanCoherence === null ? null : +sum.meanCoherence.toFixed(2),
     highPct: sum.highPct, pauseSec: sum.pauseSec,
   };
+  const ex = explain(item, loadHistory());
   const history = saveHistory(item);
+  renderExplain(ex);
   const val = v => v === null ? '–' : v;
   $('s-hr').textContent = val(item.hr);
   $('s-rmssd').textContent = item.rmssd === null ? '–' : item.rmssd + ' ms';
@@ -194,6 +208,21 @@ function finish() {
   renderHistory(history);
   show('summary');
   sess = null;
+}
+
+function renderExplain(ex) {
+  $('s-head').textContent = ex.headline;
+  $('s-body').textContent = ex.body;
+  $('s-body').parentElement.open = !ex.items.length; // zonder meetgetallen is dit de uitleg
+  const box = $('s-explain');
+  box.innerHTML = '';
+  for (const it of ex.items) {
+    const d = document.createElement('details'), sm = document.createElement('summary'), p = document.createElement('p');
+    sm.textContent = 'Wat betekent ' + (it.label === it.label.toUpperCase() ? it.label : it.label.toLowerCase()) + '?';
+    p.textContent = it.text;
+    d.append(sm, p);
+    box.appendChild(d);
+  }
 }
 
 function renderHistory(h) {
@@ -209,7 +238,12 @@ function renderHistory(h) {
 
 document.addEventListener('visibilitychange', async () => {
   if (!sess) return;
-  if (document.hidden) { if (cam) cam.close(); return; }
+  if (document.hidden) {
+    // Meteen naar pauze: iOS legt de timers stil, de tijd weg telt dan als pauze (zie session.step)
+    if (cam) { cam.close(); proc.reset(); }
+    tick();
+    return;
+  }
   if (cam) { try { await cam.open(); proc.reset(); wbLocked = false; } catch (e) { warn(cameraError(e)); } }
   if (sound) sound.resume();
   requestWakeLock();

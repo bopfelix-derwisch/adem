@@ -23,7 +23,7 @@ test('session: vinger 3 s goed → inlezen → oefenen zodra coherentie er is', 
 
 test('session: zoeken telt niet mee voor de sessieklok', () => {
   const s = createSession(60);
-  run(s, 100, { quality: 0.1, coherence: null });
+  run(s, 80, { quality: 0.1, coherence: null });
   assert.strictEqual(s.state, 'zoek-vinger');
   assert.strictEqual(s.elapsed, 0);
 });
@@ -94,4 +94,23 @@ test('session: modus zonder meting start direct, pauzeert nooit, eindigt op tijd
   assert.strictEqual(sum.meanCoherence, null);
   assert.strictEqual(sum.highPct, null);
   assert.strictEqual(sum.pauseSec, 0);
+});
+
+test('session: grote tik na achtergrond (dt 40 s) telt als pauze, niet als oefentijd', () => {
+  const s = createSession(180);
+  run(s, 3, { quality: 0.9, coherence: null });
+  run(s, 50, { quality: 0.9, coherence: 0.8 });
+  const before = Object.assign({}, s.stats);
+  step(s, 40, { quality: 0.9, coherence: 0.8 });
+  assert.ok(s.stats.practiceSec - before.practiceSec <= 2, 'oefentijd +' + (s.stats.practiceSec - before.practiceSec));
+  assert.ok(s.stats.highSec - before.highSec <= 2);
+  assert.ok(s.stats.pauseSec - before.pauseSec >= 38, 'pauze +' + (s.stats.pauseSec - before.pauseSec));
+});
+
+test('session: geen vinger binnen 90 s → einde (flitser niet eindeloos aan)', () => {
+  const s = createSession(180);
+  run(s, 89, { quality: 0, coherence: null });
+  assert.strictEqual(s.state, 'zoek-vinger');
+  run(s, 2, { quality: 0, coherence: null });
+  assert.strictEqual(s.state, 'einde');
 });

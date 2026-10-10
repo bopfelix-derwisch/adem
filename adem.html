@@ -3,40 +3,82 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e1116">
+<meta name="theme-color" content="#0b1020">
 <title>Adem</title>
 <style>
   :root {
-    --bg: #0e1116; --panel: #171b22; --fg: #e8e6e1; --muted: #8b929c;
-    --accent: #f0b85a; --line: #2a303a; --warn: #f2a65a; --err: #ff7b72; --ok: #5fd38d;
+    --bg: #0b1020; --bg2: #121a30; --panel: rgba(255,255,255,0.05); --panel-hi: rgba(255,255,255,0.09);
+    --fg: #ecebe6; --muted: #98a0b3; --line: rgba(255,255,255,0.10);
+    --cool: #4790d8; --mid: #49bd8a; --warm: #f1af57;
+    --accent: var(--warm); --warn: #f2a65a; --err: #ff8a80; --ok: #5fd38d;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
+  html, body { margin: 0; min-height: 100%; }
   body {
-    background: var(--bg); color: var(--fg);
-    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(71,144,216,0.18), transparent 60%),
+      radial-gradient(100% 50% at 100% 100%, rgba(241,175,87,0.12), transparent 60%),
+      linear-gradient(180deg, var(--bg), var(--bg2));
+    background-attachment: fixed;
+    color: var(--fg);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
-    display: flex; flex-direction: column; min-height: 100%;
+    display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
   }
   main { flex: 1; max-width: 520px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; }
-  section { display: flex; flex-direction: column; gap: 16px; padding: 24px 0; flex: 1; }
+  section { display: flex; flex-direction: column; gap: 16px; padding: 20px 0; flex: 1; }
   section[hidden] { display: none; }
-  h1 { font-size: 28px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  h1 { font-size: 34px; font-weight: 300; margin: 0; letter-spacing: 0.02em; }
+  h2 { font-size: 22px; font-weight: 500; margin: 0; line-height: 1.3; }
   p { margin: 0; color: var(--muted); }
   label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 14px; }
   label b { color: var(--fg); font-weight: 600; }
   input[type=range] { width: 100%; accent-color: var(--accent); }
   select, button {
     font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; padding: 12px 14px; min-height: 44px;
+    border-radius: 14px; padding: 12px 14px; min-height: 44px;
   }
-  button.primary { background: var(--accent); color: #1a1408; border: 0; font-weight: 600; font-size: 18px; }
+  button { cursor: pointer; transition: background .2s, transform .1s; }
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: 0.6; }
+  button.primary {
+    background: linear-gradient(90deg, var(--cool), var(--mid) 50%, var(--warm));
+    color: #0b1020; border: 0; font-weight: 650; font-size: 18px; min-height: 54px;
+    box-shadow: 0 8px 30px rgba(241,175,87,0.18);
+  }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
   .note { font-size: 14px; }
   .err { color: var(--err); font-size: 14px; min-height: 1em; }
   .warn { color: var(--warn); font-size: 14px; min-height: 1em; text-align: center; }
+
+  /* Startscherm: kleine bol die al zachtjes ademt, koel → warm */
+  .hero { display: flex; align-items: center; gap: 18px; }
+  .orb {
+    flex: none; width: 64px; height: 64px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #cfe3f7, var(--cool) 60%);
+    box-shadow: 0 0 30px rgba(71,144,216,0.45);
+    animation: breathe 11s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(0.72); background: radial-gradient(circle at 35% 30%, #cfe3f7, var(--cool) 60%); box-shadow: 0 0 20px rgba(71,144,216,0.4); }
+    40% { transform: scale(1); background: radial-gradient(circle at 35% 30%, #fbe6c4, var(--warm) 60%); box-shadow: 0 0 40px rgba(241,175,87,0.5); }
+  }
+
+  fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  legend { color: var(--muted); font-size: 14px; margin-bottom: 6px; padding: 0; }
+  .choice { flex-direction: row; align-items: center; gap: 12px; color: var(--fg); font-size: 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-height: 44px; transition: border-color .2s, background .2s; }
+  .choice:has(input:checked) { border-color: rgba(241,175,87,0.6); background: var(--panel-hi); }
+  .choice input { accent-color: var(--accent); width: 20px; height: 20px; margin: 0; flex: none; }
+  .choice small { display: block; color: var(--muted); font-size: 13px; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .modes .choice { flex-direction: column; align-items: flex-start; gap: 6px; }
+
+  /* Oefenen */
   #practice { gap: 8px; }
-  .top { display: flex; justify-content: space-between; align-items: baseline; color: var(--muted); font-size: 14px; }
-  .top b { color: var(--fg); font-size: 22px; font-variant-numeric: tabular-nums; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; color: var(--muted); font-size: 14px; min-height: 30px; }
+  .top b { color: var(--fg); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
   .sig { display: flex; align-items: baseline; gap: 6px; }
   .heart { display: inline-block; font-size: 22px; line-height: 1; color: var(--muted); transition: color .3s; }
   .heart.tick { animation: tick .3s ease-out; }
@@ -46,42 +88,53 @@
   .sig[data-level=geen] .heart { color: var(--err); }
   #sigtext { font-size: 13px; }
   [data-mode=adem] .sig, [data-mode=adem] #lens, #summary[data-mode=adem] .hart-only { display: none; }
-  fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-  legend { color: var(--muted); font-size: 14px; margin-bottom: 6px; padding: 0; }
-  .choice { flex-direction: row; align-items: center; gap: 10px; color: var(--fg); font-size: 16px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 44px; }
-  .choice input { accent-color: var(--accent); width: 20px; height: 20px; margin: 0; }
-  .choice small { display: block; color: var(--muted); font-size: 13px; }
-  @media (prefers-reduced-motion: reduce) { .heart.tick { animation: none; } }
-  #circle { width: 100%; flex: 1; min-height: 300px; }
-  #status { text-align: center; font-size: 17px; min-height: 2.9em; }
+  #circle { width: 100%; flex: 1; min-height: 340px; }
+  #status { text-align: center; font-size: 18px; font-weight: 300; min-height: 2.9em; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .row > * { flex: 1 1 auto; }
   .row input[type=range] { flex: 2 1 120px; }
-  dl { display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; margin: 0; }
-  dt { color: var(--muted); } dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+
+  /* Resultaten */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .stat span { color: var(--muted); font-size: 13px; }
+  .stat b { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  #s-explain { display: flex; flex-direction: column; gap: 8px; }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  details summary { cursor: pointer; color: var(--fg); font-size: 15px; }
+  details p { margin-top: 8px; font-size: 14px; line-height: 1.55; }
+  .body { font-size: 15px; line-height: 1.6; }
   #history { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  .small { font-size: 13px; }
   video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 12px 0; }
+  @media (prefers-reduced-motion: reduce) { .heart.tick, .orb { animation: none; } }
 </style>
 </head>
 <body>
 <main>
   <section id="setup">
-    <h1>Adem</h1>
-    <p>Adem rustig mee met de cirkel. De camera meet via je vingertop je hartslag; kleur en klank laten zien hoe gelijkmatig je hartritme met je adem meegolft.</p>
-    <fieldset>
+    <div class="hero">
+      <div class="orb" aria-hidden="true"></div>
+      <div>
+        <h1>Adem</h1>
+        <p>Adem mee met de bol. Hoe rustiger en gelijkmatiger je hart meegolft, hoe warmer de kleur en voller de klank.</p>
+      </div>
+    </div>
+    <fieldset class="modes">
       <legend>Modus</legend>
-      <label class="choice"><input type="radio" name="mode" value="hart" checked><span>Met hartslag<small>vinger op de camera, met coherentie-feedback</small></span></label>
+      <label class="choice"><input type="radio" name="mode" value="hart" checked><span>Met hartslag<small>vinger op de camera, kleur volgt je coherentie</small></span></label>
       <label class="choice"><input type="radio" name="mode" value="adem"><span>Alleen ademen<small>geen camera of flitser — niets wordt warm</small></span></label>
     </fieldset>
-    <label>Ademtempo: <b><span id="tempo-val">5,5</span> per minuut</b>
-      <input id="tempo" type="range" min="4.5" max="7" step="0.5" value="5.5">
-    </label>
-    <label>Duur
-      <select id="duur"></select>
-    </label>
-    <label class="choice"><input type="checkbox" id="binaural"><span>Binaurale toon (koptelefoon)<small>6 Hz theta-verschil tussen links en rechts; of dit hersengolven meeneemt is wetenschappelijk niet eenduidig</small></span></label>
+    <div class="card">
+      <label>Ademtempo: <b><span id="tempo-val">5,5</span> per minuut</b>
+        <input id="tempo" type="range" min="4.5" max="7" step="0.5" value="5.5">
+      </label>
+      <label>Duur
+        <select id="duur"></select>
+      </label>
+      <label class="choice"><input type="checkbox" id="binaural"><span>Binaurale toon (koptelefoon)<small>6 Hz theta-verschil tussen links en rechts; of dit hersengolven meeneemt is wetenschappelijk niet eenduidig</small></span></label>
+    </div>
     <p class="note" id="mode-note"></p>
     <button id="begin" class="primary">Begin</button>
     <div id="err" class="err" role="alert"></div>
@@ -107,17 +160,19 @@
   </section>
 
   <section id="summary" hidden>
-    <h1>Klaar</h1>
-    <dl>
-      <dt>Modus</dt><dd id="s-mode">–</dd>
-      <dt>Ademtempo</dt><dd id="s-tempo">–</dd>
-      <dt class="hart-only">Gemiddelde hartslag</dt><dd class="hart-only" id="s-hr">–</dd>
-      <dt class="hart-only">RMSSD</dt><dd class="hart-only" id="s-rmssd">–</dd>
-      <dt class="hart-only">Gemiddelde coherentie</dt><dd class="hart-only" id="s-coh">–</dd>
-      <dt class="hart-only">Tijd in hoge coherentie</dt><dd class="hart-only" id="s-high">–</dd>
-      <dt class="hart-only">Pauze</dt><dd class="hart-only" id="s-pause">–</dd>
-    </dl>
-    <p>Eerdere sessies (alleen op dit toestel)</p>
+    <h2 id="s-head">Klaar</h2>
+    <div class="stats">
+      <div class="stat"><span>Modus</span><b id="s-mode">–</b></div>
+      <div class="stat"><span>Ademtempo</span><b id="s-tempo">–</b></div>
+      <div class="stat hart-only"><span>Gem. hartslag</span><b id="s-hr">–</b></div>
+      <div class="stat hart-only"><span>RMSSD</span><b id="s-rmssd">–</b></div>
+      <div class="stat hart-only"><span>Gem. coherentie</span><b id="s-coh">–</b></div>
+      <div class="stat hart-only"><span>Tijd in hoge coherentie</span><b id="s-high">–</b></div>
+      <div class="stat hart-only"><span>Pauze</span><b id="s-pause">–</b></div>
+    </div>
+    <div id="s-explain"></div>
+    <details><summary>Waarom werkt dit?</summary><p id="s-body" class="body"></p></details>
+    <p class="small">Eerdere sessies (alleen op dit toestel)</p>
     <ul id="history"></ul>
     <button id="again" class="primary">Nog een keer</button>
   </section>

@@ -106,3 +106,37 @@ test('signal: ruis met meerdere seeds → kwaliteit blijft < 0,3', () => {
     assert.ok(Math.max(...qs) < 0.3, `seed ${seed}: kwaliteit max ${Math.max(...qs).toFixed(2)}`);
   }
 });
+
+// Review #1/#2: vinger eraf → camera ziet geen rood meer. Direct q = 0 en geen ruisslagen.
+function fingerOffOn() {
+  const b1 = beatTimes({ seconds: 30, modAmp: 0 });
+  const b2 = beatTimes({ seconds: 30, modAmp: 0 }).map(t => t + 45);
+  return [
+    ...ppgFrames({ beats: b1, seconds: 30 }),
+    ...noiseFrames({ seconds: 15 }).map(f => Object.assign({}, f, { t: f.t + 30 })),
+    ...ppgFrames({ beats: b2, seconds: 75 }).filter(f => f.t >= 45),
+  ];
+}
+
+test('signal: vinger eraf → binnen 1 s kwaliteit 0 en geen slagen zolang hij weg is', () => {
+  const p = new PpgProcessor(), found = [];
+  let q31 = null;
+  for (const f of fingerOffOn()) {
+    const b = p.push(f);
+    if (b !== null) found.push(b);
+    if (q31 === null && f.t >= 31) q31 = p.quality().q;
+  }
+  assert.strictEqual(q31, 0, 'kwaliteit 1 s na weghalen: ' + q31);
+  assert.ok(!found.some(t => t > 30.2 && t < 45), 'ruisslagen: ' + found.filter(t => t > 30.2 && t < 45).map(t => t.toFixed(1)));
+  assert.ok(found.filter(t => t > 50).length > 15, 'slagen na terugleggen');
+});
+
+test('signal: vinger terug → kwaliteit binnen 6 s weer > 0,5', () => {
+  const p = new PpgProcessor();
+  let back = null;
+  for (const f of fingerOffOn()) {
+    p.push(f);
+    if (f.t >= 45 && back === null && Math.floor(f.t * 4) !== Math.floor((f.t - 1 / 60) * 4) && p.quality().q > 0.5) back = f.t;
+  }
+  assert.ok(back !== null && back < 51, 'kwaliteit weer goed op ' + back);
+});

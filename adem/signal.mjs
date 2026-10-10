@@ -7,6 +7,10 @@ const SETTLE = 2.0;       // s na (her)start geen slagen melden: filter slingert
 const Q_WINDOW = 8;       // s, venster voor de kwaliteit
 const MAX_STEP = 0.3;     // max relatieve RR-verandering per slag (ademgolf ~12 %, plus meetruis)
 const MIN_SHAPE = 0.85;   // min correlatie tussen de golfvormen van opeenvolgende slagen
+const OFF_AFTER = 0.5;    // s zonder rood beeld → vinger weg
+
+// Vinger + flitser op de lens geeft een overwegend rood beeld; zonder vinger niet
+const isFinger = f => f.r > 40 && f.r > 1.3 * f.g && f.r > 1.3 * f.b;
 
 // 2e-orde Butterworth-biquad (RBJ-cookbook), type 'hp' of 'lp'
 export function biquad(type, f0, fs) {
@@ -115,6 +119,8 @@ export class PpgProcessor {
     this.fs = null;
     this.active = 'r';
     this.lastT = null;
+    this.offSince = null;
+    this.fingerOff = false;
   }
 
   get channel() { return this.active; }
@@ -124,6 +130,14 @@ export class PpgProcessor {
     if (this.lastT !== null && f.t <= this.lastT) return null;       // dubbel/oud frame
     if (this.lastT !== null && f.t - this.lastT > GAP_RESET) this.reset();
     this.lastT = f.t;
+    // Vinger weg: meteen kwaliteit 0 en geen (ruis)slagen; bij terugleggen schoon herstarten
+    if (!isFinger(f)) {
+      if (this.offSince === null) this.offSince = f.t;
+      if (f.t - this.offSince >= OFF_AFTER) { this.fingerOff = true; this.pre = []; this.tracks = null; }
+      return null;
+    }
+    this.offSince = null;
+    this.fingerOff = false;
     if (!this.tracks) {
       this.pre.push(f);
       if (this.pre.length < 30) return null;
@@ -138,7 +152,7 @@ export class PpgProcessor {
 
   // Elke ~1 s aanroepen: kiest het kanaal met de beste kwaliteit
   quality() {
-    if (!this.tracks) return { q: 0, bpm: null, fps: this.fs };
+    if (this.fingerOff || !this.tracks) return { q: 0, bpm: null, fps: this.fs };
     const qr = this.tracks.r.quality(), qg = this.tracks.g.quality();
     this.active = qg.q > qr.q + 0.1 ? 'g' : qr.q > qg.q + 0.1 ? 'r' : this.active;
     const q = this.active === 'r' ? qr : qg;

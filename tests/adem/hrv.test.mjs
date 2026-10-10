@@ -1,6 +1,6 @@
 import assert from 'assert';
 import { test } from '../harness.mjs';
-import { rrSeries, heartRate, rmssd, coherence, level } from '../../adem/hrv.mjs';
+import { rrSeries, heartRate, rmssd, coherence, level, addBeat } from '../../adem/hrv.mjs';
 import { beatTimes, rng, gauss } from './synth.mjs';
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b}`);
@@ -59,4 +59,12 @@ test('hrv: sterke ademgolf (RR 0,85 ± 0,25 s) — toppen en dalen blijven behou
   const all = beats.length - 1, kept = rrSeries(beats).length;
   assert.strictEqual(kept, all, `${all - kept} echte intervallen weggegooid`);
   assert.ok(coherence(beats, 70).value > 0.6, 'coherentie');
+});
+
+test('hrv: addBeat — klok die terugspringt (nieuwe camerastroom) begint een schone reeks', () => {
+  let b = [];
+  for (const t of [100, 100.8, 101.6]) b = addBeat(b, t);
+  assert.deepStrictEqual(b, [100, 100.8, 101.6]);
+  b = addBeat(b, 3.2);
+  assert.deepStrictEqual(b, [3.2]);
 });

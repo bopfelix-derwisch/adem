@@ -81,3 +81,10 @@ export function coherence(beats, now) {
 export function level(c) {
   return c < LEVELS.low ? 'laag' : c > LEVELS.high ? 'hoog' : 'midden';
 }
+
+// Slag toevoegen; springt de klok terug (nieuwe camerastroom), dan begint een schone reeks
+export function addBeat(beats, t) {
+  if (beats.length && t <= beats[beats.length - 1]) return [t];
+  beats.push(t);
+  return beats;
+}
