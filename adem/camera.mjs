@@ -16,6 +16,11 @@ export function rankCameras(devices, storedId) {
   return back.slice().sort((a, b) => score(a) - score(b));
 }
 
+// Geen harde minimum-framerate: een tragere camera moet nog openen (de app waarschuwt bij < 24 fps)
+export function videoConstraints(which) {
+  return Object.assign({ width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 60 } }, which);
+}
+
 export class Camera {
   constructor(video, onFrame) {
     this.video = video;
@@ -53,7 +58,7 @@ export class Camera {
     this.close();
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: Object.assign({ width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 60, min: 24 } }, which),
+      video: videoConstraints(which),
     });
     this.track = this.stream.getVideoTracks()[0];
     this.video.srcObject = this.stream;

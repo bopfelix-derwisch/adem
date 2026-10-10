@@ -1,6 +1,6 @@
 import assert from 'assert';
 import { test } from '../harness.mjs';
-import { rankCameras } from '../../adem/camera.mjs';
+import { rankCameras, videoConstraints } from '../../adem/camera.mjs';
 
 // Labels zoals gemeten op iPhone 15 Pro (iOS 26, NL)
 const IPHONE15PRO = [
@@ -25,4 +25,12 @@ test('camera: toestel zonder telelens (Engelse labels) → gewone back camera', 
   const devs = ['Front Camera', 'Back Dual Wide Camera', 'Back Ultra Wide Camera', 'Back Camera']
     .map((label, i) => ({ deviceId: 'd' + i, label }));
   assert.strictEqual(rankCameras(devs, null)[0].label, 'Back Camera');
+});
+
+test('camera: geen harde minimum-framerate (te trage camera → waarschuwing, niet weigeren)', () => {
+  const c = videoConstraints({ facingMode: 'environment' });
+  assert.strictEqual(c.frameRate.min, undefined);
+  assert.strictEqual(c.frameRate.ideal, 60);
+  assert.strictEqual(c.facingMode, 'environment');
+  assert.deepStrictEqual(videoConstraints({ deviceId: { exact: 'x' } }).deviceId, { exact: 'x' });
 });

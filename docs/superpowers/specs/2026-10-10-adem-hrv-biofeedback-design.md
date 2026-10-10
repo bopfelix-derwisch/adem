@@ -69,7 +69,7 @@ Minimaal 45 s aan schone RR nodig; daarvoor toont de pagina "inlezen…".
 ## Camera
 
 - Na de eerste `getUserMedia({facingMode:'environment'})` zijn labels beschikbaar; kies dan het apparaat met label `/tele/i`. Geen telelens → apparaat met `/back|achter/i` zonder `/dual|triple|ultra|dubbel|drievoud|breed|front|voor/i`.
-- Constraints: 640×480 ideaal, `frameRate {ideal: 60, min: 24}`.
+- Constraints: 640×480 ideaal, `frameRate {ideal: 60}` — bewust géén `min`: een tragere camera moet openen, de app waarschuwt bij < 24 fps.
 - Flitser: `applyConstraints({advanced:[{torch:true}]})`.
 - Witbalans: 2,5 s nadat de signaalkwaliteit voor het eerst > 0,5 is → `whiteBalanceMode: 'manual'` (als ondersteund).
 - Timestamps: `requestVideoFrameCallback` → `metadata.captureTime`, anders `mediaTime`, anders `performance.now()`.
