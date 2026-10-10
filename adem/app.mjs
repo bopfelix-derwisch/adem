@@ -9,9 +9,12 @@ import { Sound } from './audio.mjs';
 import { Visual } from './visual.mjs';
 import { ademWarmth } from './palette.mjs';
 import { explain } from './explain.mjs';
+import { assess } from './norms.mjs';
+import { suggestTempo } from './tempo.mjs';
+import { colorAt } from './palette.mjs';
 
 const $ = id => document.getElementById(id);
-const HISTORY_KEY = 'adem.history';
+const HISTORY_KEY = 'adem.history', PROFILE_KEY = 'adem.profile';
 const TAU = 10;        // s, gladstrijken coherentie
 const COH_EVERY = 5;   // s tussen coherentieberekeningen
 
@@ -21,7 +24,7 @@ let cohRaw = null, cohSmooth = null, prevBreath = null, quality = 0;
 let wbLocked = false, wakeLock = null, timer = null, raf = null, volume = 0.7, muted = false;
 let measured = true, lastBreathSet = 0, starting = false;
 
-function show(screen) { for (const id of ['setup', 'practice', 'summary']) $(id).hidden = id !== screen; }
+function show(screen) { for (const id of ['profile', 'setup', 'practice', 'summary']) $(id).hidden = id !== screen; }
 function setStatus(text) { $('status').textContent = text; }
 function warn(text) { $('warn').textContent = text; }
 const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -32,6 +35,46 @@ function saveHistory(item) {
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch (e) { /* privémodus: alleen dit scherm */ }
   return h;
 }
+
+// Profiel (leeftijd, geslacht, lengte, gewicht): alleen op dit toestel
+function loadProfile() {
+  try { const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); return p && typeof p === 'object' ? p : null; } catch (e) { return null; }
+}
+function storeProfile(p) { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { /* privémodus */ } }
+let profile = loadProfile();
+
+const num = id => { const v = parseFloat($(id).value.replace(',', '.')); return isFinite(v) ? v : null; };
+function openProfile() {
+  const p = profile || {};
+  $('p-age').value = p.age || ''; $('p-sex').value = p.sex || ''; $('p-height').value = p.height || ''; $('p-weight').value = p.weight || '';
+  $('p-err').textContent = '';
+  show('profile');
+}
+function saveProfile() {
+  const p = { age: num('p-age'), sex: $('p-sex').value || null, height: num('p-height'), weight: num('p-weight') };
+  if (p.age !== null && (p.age < 12 || p.age > 110)) { $('p-err').textContent = 'Leeftijd tussen 12 en 110.'; return; }
+  if (p.height !== null && (p.height < 100 || p.height > 230)) { $('p-err').textContent = 'Lengte in centimeters (100–230).'; return; }
+  if (p.weight !== null && (p.weight < 25 || p.weight > 300)) { $('p-err').textContent = 'Gewicht in kilo (25–300).'; return; }
+  profile = p; storeProfile(p);
+  toSetup();
+}
+function skipProfile() { if (!profile) { profile = {}; storeProfile(profile); } toSetup(); }
+
+function profileText(p) {
+  if (!p || !(p.age || p.height || p.weight)) return 'Geen profiel — vul in voor normen en tempovoorstel';
+  return [p.age && p.age + ' jaar', p.sex === 'v' ? 'vrouw' : p.sex === 'm' ? 'man' : null,
+    p.height && (p.height / 100).toFixed(2).replace('.', ',') + ' m', p.weight && p.weight + ' kg'].filter(Boolean).join(' · ');
+}
+
+const fmtT = t => (+t).toFixed(1).replace('.', ',');
+function applySuggestion() {
+  const s = suggestTempo(profile, loadHistory());
+  $('tempo').value = s.tempo; $('tempo-val').textContent = fmtT(s.tempo);
+  $('tempo-hint').innerHTML = '';
+  const b = document.createElement('b'); b.textContent = 'Voorstel ' + fmtT(s.tempo) + ' per minuut. ';
+  $('tempo-hint').append(b, s.reason);
+}
+function toSetup() { $('profile-sum').textContent = profileText(profile); applySuggestion(); show('setup'); }
 
 async function requestWakeLock() {
   try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { wakeLock = null; }
@@ -195,22 +238,49 @@ function finish() {
   };
   const ex = explain(item, loadHistory());
   const history = saveHistory(item);
-  renderExplain(ex);
+  const as = assess(item, profile);
+  renderExplain(ex, as);
+  renderAssessment(as);
+  for (const b of document.querySelectorAll('#feel button')) b.setAttribute('aria-pressed', 'false');
+  $('next-tempo').textContent = '';
   const val = v => v === null ? '–' : v;
   $('s-hr').textContent = val(item.hr);
   $('s-rmssd').textContent = item.rmssd === null ? '–' : item.rmssd + ' ms';
-  $('s-coh').textContent = item.coherence === null ? '–' : item.coherence.toFixed(2) + ' (' + level(item.coherence) + ')';
+  $('s-coh').textContent = item.coherence === null ? '–' : item.coherence.toFixed(2).replace('.', ',');
   $('s-high').textContent = item.highPct === null ? '–' : item.highPct + ' %';
   $('s-pause').textContent = mmss(item.pauseSec);
   $('s-mode').textContent = measured ? 'met hartslag' : 'alleen ademen';
-  $('s-tempo').textContent = String(bpmBreath).replace('.', ',') + ' per minuut';
+  $('s-tempo').textContent = fmtT(bpmBreath) + ' per minuut';
   $('summary').dataset.mode = item.mode;
   renderHistory(history);
   show('summary');
   sess = null;
 }
 
-function renderExplain(ex) {
+// Kleur per uitkomst volgens de norm (koel = laag, groen = gemiddeld, warm = hoog/gunstig)
+function renderAssessment(as) {
+  for (const key of ['hr', 'rmssd', 'coherence', 'bmi']) {
+    const card = $('c-' + key), a = as[key];
+    card.style.removeProperty('--tone');
+    card.querySelector('.verdict').textContent = a ? a.verdict : '';
+    card.querySelector('.norm').textContent = a ? a.norm : '';
+    if (a) card.style.setProperty('--tone', 'rgb(' + colorAt(a.tone).join(',') + ')');
+  }
+  $('c-bmi').hidden = !as.bmi;
+  if (as.bmi) $('s-bmi').textContent = as.bmi.value.toFixed(1).replace('.', ',');
+}
+
+function chooseFeel(feel, btn) {
+  const h = loadHistory();
+  if (!h.length) return;
+  h[0].feel = feel;
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch (e) { /* privémodus */ }
+  for (const b of document.querySelectorAll('#feel button')) b.setAttribute('aria-pressed', String(b === btn));
+  const s = suggestTempo(profile, h);
+  $('next-tempo').textContent = 'Volgende keer: ' + fmtT(s.tempo) + ' per minuut. ' + s.reason;
+}
+
+function renderExplain(ex, as) {
   $('s-head').textContent = ex.headline;
   $('s-body').textContent = ex.body;
   $('s-body').parentElement.open = !ex.items.length; // zonder meetgetallen is dit de uitleg
@@ -219,7 +289,7 @@ function renderExplain(ex) {
   for (const it of ex.items) {
     const d = document.createElement('details'), sm = document.createElement('summary'), p = document.createElement('p');
     sm.textContent = 'Wat betekent ' + (it.label === it.label.toUpperCase() ? it.label : it.label.toLowerCase()) + '?';
-    p.textContent = it.text;
+    p.textContent = it.text + (as && as[it.key] ? ' ' + as[it.key].text : '');
     d.append(sm, p);
     box.appendChild(d);
   }
@@ -231,7 +301,7 @@ function renderHistory(h) {
   for (const it of h) {
     const li = document.createElement('li');
     const d = new Date(it.date);
-    li.textContent = `${d.toLocaleDateString('nl-NL')} ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })} · ${it.minutes} min · ${it.mode === 'adem' ? 'alleen ademen' : 'coherentie ' + (it.coherence === null ? '–' : it.coherence.toFixed(2))}`;
+    li.textContent = `${d.toLocaleDateString('nl-NL')} ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })} · ${it.minutes} min · ${it.mode === 'adem' ? 'alleen ademen' : 'coherentie ' + (it.coherence === null ? '–' : it.coherence.toFixed(2).replace('.', ','))}`;
     ul.appendChild(li);
   }
 }
@@ -268,7 +338,11 @@ function fillDurations() {
 }
 document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', fillDurations));
 fillDurations();
-$('again').addEventListener('click', () => show('setup'));
+$('again').addEventListener('click', toSetup);
+$('edit-profile').addEventListener('click', openProfile);
+$('p-save').addEventListener('click', saveProfile);
+$('p-skip').addEventListener('click', skipProfile);
+document.querySelectorAll('#feel button').forEach(b => b.addEventListener('click', () => chooseFeel(b.dataset.feel, b)));
 $('stop').addEventListener('click', () => { if (sess) finish(); });
 $('lens').addEventListener('click', async () => {
   if (!cam) return;
@@ -281,3 +355,4 @@ $('mute').addEventListener('click', () => {
   if (sound) sound.setVolume(muted ? 0 : volume);
 });
 renderHistory(loadHistory());
+if (profile) toSetup(); else openProfile(); // eerste keer: profiel vragen (overslaan kan)

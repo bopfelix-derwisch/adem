@@ -99,6 +99,18 @@
   .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
   .stat span { color: var(--muted); font-size: 13px; }
   .stat b { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat { border-left: 4px solid var(--tone, var(--line)); }
+  .stat small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+  .stat .verdict { color: var(--tone, var(--muted)); font-size: 13px; font-weight: 600; }
+  .profile-sum { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+  .profile-sum button { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+  .hint { font-size: 13px; color: var(--muted); }
+  .hint b { color: var(--fg); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  input[type=number] { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-height: 44px; width: 100%; }
+  .feel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .feel button { font-size: 14px; }
+  .feel button[aria-pressed=true] { border-color: rgba(241,175,87,0.7); background: var(--panel-hi); }
   #s-explain { display: flex; flex-direction: column; gap: 8px; }
   details { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
   details summary { cursor: pointer; color: var(--fg); font-size: 15px; }
@@ -113,6 +125,30 @@
 </head>
 <body>
 <main>
+  <section id="profile" hidden>
+    <div class="hero">
+      <div class="orb" aria-hidden="true"></div>
+      <div>
+        <h1>Over jou</h1>
+        <p>Hiermee vergelijk ik je uitkomsten met leeftijdgenoten en stel ik een ademtempo voor. Alles blijft op je telefoon.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="grid2">
+        <label>Leeftijd <input id="p-age" type="number" inputmode="numeric" min="12" max="110" placeholder="jaar"></label>
+        <label>Geslacht (optioneel)
+          <select id="p-sex"><option value="">—</option><option value="v">vrouw</option><option value="m">man</option></select>
+        </label>
+        <label>Lengte <input id="p-height" type="number" inputmode="numeric" min="100" max="230" placeholder="cm"></label>
+        <label>Gewicht <input id="p-weight" type="number" inputmode="decimal" min="25" max="300" placeholder="kg"></label>
+      </div>
+      <p class="hint">Leeftijd en geslacht bepalen de norm voor je hartslagvariatie; lengte en geslacht je geschatte ideale ademtempo; met gewicht en lengte duid ik je hartslagvariatie (BMI).</p>
+    </div>
+    <button id="p-save" class="primary">Opslaan</button>
+    <button id="p-skip">Overslaan</button>
+    <div id="p-err" class="err" role="alert"></div>
+  </section>
+
   <section id="setup">
     <div class="hero">
       <div class="orb" aria-hidden="true"></div>
@@ -121,6 +157,7 @@
         <p>Adem mee met de bol. Hoe rustiger en gelijkmatiger je hart meegolft, hoe warmer de kleur en voller de klank.</p>
       </div>
     </div>
+    <div class="profile-sum"><span id="profile-sum">Geen profiel</span><button id="edit-profile">Profiel</button></div>
     <fieldset class="modes">
       <legend>Modus</legend>
       <label class="choice"><input type="radio" name="mode" value="hart" checked><span>Met hartslag<small>vinger op de camera, kleur volgt je coherentie</small></span></label>
@@ -130,6 +167,7 @@
       <label>Ademtempo: <b><span id="tempo-val">5,5</span> per minuut</b>
         <input id="tempo" type="range" min="4.5" max="7" step="0.5" value="5.5">
       </label>
+      <p class="hint" id="tempo-hint"></p>
       <label>Duur
         <select id="duur"></select>
       </label>
@@ -164,11 +202,22 @@
     <div class="stats">
       <div class="stat"><span>Modus</span><b id="s-mode">–</b></div>
       <div class="stat"><span>Ademtempo</span><b id="s-tempo">–</b></div>
-      <div class="stat hart-only"><span>Gem. hartslag</span><b id="s-hr">–</b></div>
-      <div class="stat hart-only"><span>RMSSD</span><b id="s-rmssd">–</b></div>
-      <div class="stat hart-only"><span>Gem. coherentie</span><b id="s-coh">–</b></div>
+      <div class="stat hart-only" id="c-hr"><span>Gem. hartslag</span><b id="s-hr">–</b><small class="verdict"></small><small class="norm"></small></div>
+      <div class="stat hart-only" id="c-rmssd"><span>RMSSD</span><b id="s-rmssd">–</b><small class="verdict"></small><small class="norm"></small></div>
+      <div class="stat hart-only" id="c-coherence"><span>Gem. coherentie</span><b id="s-coh">–</b><small class="verdict"></small><small class="norm"></small></div>
       <div class="stat hart-only"><span>Tijd in hoge coherentie</span><b id="s-high">–</b></div>
       <div class="stat hart-only"><span>Pauze</span><b id="s-pause">–</b></div>
+      <div class="stat" id="c-bmi" hidden><span>BMI</span><b id="s-bmi">–</b><small class="verdict"></small><small class="norm"></small></div>
+    </div>
+    <div class="card">
+      <p style="color:var(--fg)">Hoe voelde dit ademtempo?</p>
+      <div class="feel" id="feel">
+        <button data-feel="prettig">Prettig, rustig</button>
+        <button data-feel="luchthonger">Te langzaam / luchthonger</button>
+        <button data-feel="gejaagd">Te snel / gejaagd</button>
+        <button data-feel="duizelig">Duizelig of tintelingen</button>
+      </div>
+      <p class="hint" id="next-tempo"></p>
     </div>
     <div id="s-explain"></div>
     <details><summary>Waarom werkt dit?</summary><p id="s-body" class="body"></p></details>
