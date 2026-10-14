@@ -6,8 +6,10 @@ const GAP_RESET = 1.0;    // s zonder frames → opnieuw beginnen
 const SETTLE = 2.0;       // s na (her)start geen slagen melden: filter slingert nog in
 const Q_WINDOW = 8;       // s, venster voor de kwaliteit
 const MAX_STEP = 0.3;     // max relatieve RR-verandering per slag (ademgolf ~12 %, plus meetruis)
-const MIN_SHAPE = 0.85;   // min correlatie tussen de golfvormen van opeenvolgende slagen
+const MIN_SHAPE = 0.85;   // min correlatie met de golfvorm van een van de vorige slagen
+const SHAPE_REFS = 3;     // met hoeveel vorige slagen de vorm vergeleken wordt
 const OFF_AFTER = 0.5;    // s zonder rood beeld → vinger weg
+const PEAK_WIN = 0.15;    // s; slag = steilste stijging binnen ±PEAK_WIN
 
 // Vinger + flitser op de lens geeft een overwegend rood beeld; zonder vinger niet
 const isFinger = f => f.r > 40 && f.r > 1.3 * f.g && f.r > 1.3 * f.b;
@@ -36,7 +38,8 @@ export function makeBandpass(fs) {
 class Track {
   constructor(fs, warmup, key) {
     this.key = key;
-    this.span = Math.max(1, Math.round(fs / 30)); // afgeleide over ±span frames: minder ruis
+    this.span = Math.max(1, Math.round(fs / 20)); // afgeleide over ±span frames (~0,1 s): minder ruis
+    this.win = Math.max(2, Math.round(PEAK_WIN * fs)); // frames rond een kandidaat-slag
     this.settleUntil = warmup[warmup.length - 1].t + SETTLE;
     this.filter = makeBandpass(fs);
     this.F = [];
@@ -51,14 +54,17 @@ class Track {
     const F = this.F;
     F.push({ t: f.t, y: this.filter(-(f[this.key] - this.offset)) }); // inverteren: dip = slag
     while (F.length && f.t - F[0].t > KEEP) F.shift();
-    const h = this.span, n = F.length, i = n - 2 - h;
-    if (i < 1 + h) return null;
+    const h = this.span, w = this.win, n = F.length, i = n - 1 - h - w;
+    if (i < h + w) return null;
     const d = k => (F[k + h].y - F[k - h].y) / (F[k + h].t - F[k - h].t);
     const d0 = d(i - 1), d1 = d(i), d2 = d(i + 1);
     if (!(d1 > d0 && d1 >= d2 && d1 > 0)) return null;
+    // Alleen de steilste stijging in de buurt telt; een ruispiekje vlak vóór de echte
+    // opgaande flank zou anders winnen en de echte slag blokkeren (refractaire tijd)
+    for (let k = i - w; k <= i + w; k++) if (k !== i && d(k) > d1) return null;
     let maxD = 0;
     for (let k = n - 1 - h; k >= h && F[k].t > f.t - 3; k--) maxD = Math.max(maxD, d(k));
-    if (d1 < 0.4 * maxD || f.t < this.settleUntil) return null;
+    if (d1 < 0.4 * maxD || F[i].t < this.settleUntil) return null;
     const den = d0 - 2 * d1 + d2, off = den ? 0.5 * (d0 - d2) / den : 0;
     const tb = F[i].t + off * (F[i + 1].t - F[i - 1].t) / 2;
     if (tb - this.lastBeat < REFRACTORY) return null;
@@ -74,29 +80,36 @@ class Track {
   }
 
   // Kwaliteit = aandeel van de laatste 8 s dat bestaat uit "goede" slagen: interval
-  // binnen 0,33–1,5 s, < 30 % verschil met het vorige interval, en een golfvorm die op
-  // de vorige slag lijkt. Robuust voor een sterk meegolvende hartslag (geen vaste periode
-  // nodig, anders dan autocorrelatie); ruis heeft geen herhaalde vorm.
+  // binnen 0,33–1,5 s, < 30 % verschil met de mediaan van de omliggende intervallen, en
+  // een golfvorm die op een van de vorige slagen lijkt. Robuust voor een sterk meegolvende
+  // hartslag (geen vaste periode nodig, anders dan autocorrelatie); ruis heeft geen
+  // herhaalde vorm. Eén gemiste of valse slag kost zo alleen zijn eigen interval(len),
+  // niet ook die van de buren.
   quality() {
     const tEnd = this.F.length ? this.F[this.F.length - 1].t : 0, ws = tEnd - Q_WINDOW;
-    const B = this.beats;
+    const B = this.beats, RR = [];
+    for (let i = 1; i < B.length; i++) RR.push(B[i] - B[i - 1]); // RR[i-1] eindigt op B[i]
     let good = 0, first = null;
     const goodRR = [];
-    for (let i = 2; i < B.length; i++) {
+    for (let i = 1; i < B.length; i++) {
       if (B[i] <= ws) continue;
       if (first === null) first = B[i - 1] > ws ? B[i - 1] : ws;
-      const rr = B[i] - B[i - 1], prev = B[i - 1] - B[i - 2];
-      if (rr < REFRACTORY || rr > 1.5 || Math.abs(rr - prev) > MAX_STEP * prev) continue;
-      if (correlation(this._segment(B[i - 1]), this._segment(B[i])) < MIN_SHAPE) continue;
+      const rr = RR[i - 1], ref = median(RR.slice(Math.max(0, i - 3), i + 2));
+      if (rr < REFRACTORY || rr > 1.5 || Math.abs(rr - ref) > MAX_STEP * ref) continue;
+      const seg = this._segment(B[i]);
+      let shape = 0;
+      for (let j = Math.max(0, i - SHAPE_REFS); j < i; j++) shape = Math.max(shape, correlation(this._segment(B[j]), seg));
+      if (shape < MIN_SHAPE) continue;
       good += Math.min(rr, B[i] - ws);
       goodRR.push(rr);
     }
     if (first === null || !goodRR.length) return { q: 0, bpm: null };
     const span = Math.max(tEnd - first, 1);
-    const med = goodRR.slice().sort((a, b) => a - b)[goodRR.length >> 1];
-    return { q: Math.min(1, good / span), bpm: 60 / med };
+    return { q: Math.min(1, good / span), bpm: 60 / median(goodRR) };
   }
 }
+
+const median = a => a.slice().sort((x, y) => x - y)[a.length >> 1];
 
 function correlation(a, b) {
   const n = Math.min(a.length, b.length);

@@ -50,3 +50,21 @@ export function noiseFrames({ seconds, fps = 60, seed = 7 }) {
   }
   return frames;
 }
+
+// Realistischer: echte golf met dicrotische bult, amplitude en basislijn die meegolven
+// met de adem, ruis zoals bij een 30 fps-lens, en af en toe een kleine beweging
+export function realisticFrames({ seconds = 120, fps = 30, noise = 0.15, amp = 1.5, seed = 1 }) {
+  const beats = beatTimes({ seconds, modAmp: 0.15, modHz: 0.09 }), rand = rng(seed), frames = [];
+  const wave = dt => dt < 0 || dt > 1.2 ? 0 : pulse(dt) + 0.25 * Math.exp(-((dt - 0.4) ** 2) / 0.004);
+  let move = 0;
+  for (let k = 0; k / fps < seconds; k++) {
+    const t = k / fps + (rand() * 2 - 1) * 0.002, a = amp * (1 + 0.4 * Math.sin(2 * Math.PI * 0.09 * t));
+    let blood = 0;
+    for (const b of beats) { if (b > t) break; blood += wave(t - b); }
+    if (rand() < 0.15 / fps) move = (rand() * 2 - 1) * 8;
+    move *= 0.85;
+    const base = 200 + 4 * Math.sin(2 * Math.PI * 0.09 * t + 1) + move;
+    frames.push({ t, r: base - a * blood + noise * gauss(rand), g: 20 - 0.3 * a * blood + noise * gauss(rand), b: 15 });
+  }
+  return frames;
+}

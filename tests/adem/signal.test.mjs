@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { test } from '../harness.mjs';
 import { PpgProcessor } from '../../adem/signal.mjs';
-import { beatTimes, ppgFrames, noiseFrames } from './synth.mjs';
+import { beatTimes, ppgFrames, noiseFrames, realisticFrames } from './synth.mjs';
 
 function run(frames) {
   const p = new PpgProcessor(), beats = [];
@@ -139,4 +139,24 @@ test('signal: vinger terug → kwaliteit binnen 6 s weer > 0,5', () => {
     if (f.t >= 45 && back === null && Math.floor(f.t * 4) !== Math.floor((f.t - 1 / 60) * 4) && p.quality().q > 0.5) back = f.t;
   }
   assert.ok(back !== null && back < 51, 'kwaliteit weer goed op ' + back);
+});
+
+// Vinger lag stil maar de app zei toch "vinger kwijt": op een ruiziger signaal won een
+// ruispiekje vóór de opgaande flank, en één foute slag keurde ook de buren af
+test('signal: realistisch signaal (30 fps, ruis, ademgolf, bewegingen) → zelden een pauze', () => {
+  let qSum = 0, n = 0, pauses = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const p = new PpgProcessor();
+    let low = 0;
+    for (const f of realisticFrames({ seed })) {
+      p.push(f);
+      if (f.t < 15 || Math.floor(f.t) === Math.floor(f.t - 1 / 30)) continue;
+      const q = p.quality().q;
+      qSum += q; n++;
+      low = q < 0.3 ? low + 1 : 0;
+      if (low === 3) pauses++; // zelfde regel als session: 3 s onder Q_BAD
+    }
+  }
+  assert.ok(qSum / n > 0.6, `gem. kwaliteit ${(qSum / n).toFixed(2)}`);
+  assert.ok(pauses <= 4, `${pauses} pauzes in 6 × 105 s`);
 });
